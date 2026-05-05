@@ -95,8 +95,8 @@ def group_and_sort_rows(rows):
         return df
 
     df = df.sort_values(
-        by=["_sort_date", "Debit"],
-        ascending=[True, False]
+        by=["Debit", "_sort_date"],
+        ascending=[False, True]
     )
 
     df["MONTH"] = df["_sort_date"].dt.strftime("%B %Y")
@@ -147,45 +147,61 @@ def auto_adjust_column_width(worksheet):
         worksheet.column_dimensions[column_letter].width = min(max_length + 2, 40)
 
 
-st.set_page_config(page_title="PDF Statement Extractor", layout="wide")
+st.set_page_config(page_title="Fuel Statement Extractor", layout="wide")
 
-st.title("PDF Statement to Excel Extractor")
+st.title("Fuel Statement Extractor")
+st.write("Upload one or more statement PDFs and generate an Excel file with month-wise sheets.")
 
-uploaded_pdf = st.file_uploader(
-    "Upload Statement PDF",
-    type=["pdf"]
+uploaded_pdfs = st.file_uploader(
+    "Upload Statement PDFs",
+    type=["pdf"],
+    accept_multiple_files=True
 )
 
-if uploaded_pdf is not None:
-    if st.button("Extract Data"):
-        rows = extract_required_rows(uploaded_pdf)
-        df = group_and_sort_rows(rows)
+if uploaded_pdfs:
+    st.info(f"{len(uploaded_pdfs)} PDF file(s) selected.")
 
-        if df.empty:
+    if st.button("Extract Data"):
+        all_rows = []
+
+        for pdf_file in uploaded_pdfs:
+            extracted_rows = extract_required_rows(pdf_file)
+            all_rows.extend(extracted_rows)
+
+        if not all_rows:
             st.warning("No valid rows found.")
         else:
-            file_name = build_file_name(rows)
+            file_name = build_file_name(all_rows)
 
-            st.success(f"Extracted {len(rows)} valid rows.")
+            st.success(f"Extracted {len(all_rows)} total valid rows.")
             st.info(f"Generated file name: {file_name}")
 
-            edited_df = st.data_editor(
-                df,
-                num_rows="dynamic",
-                use_container_width=True
+            df = pd.DataFrame(all_rows)
+
+            df = df.sort_values(
+                by=["_sort_date", "Debit"],
+                ascending=[True, False]
             )
+
+            df["MONTH"] = df["_sort_date"].dt.strftime("%B %Y")
 
             output = BytesIO()
 
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                edited_df.to_excel(
-                    writer,
-                    index=False,
-                    sheet_name="Extracted Data"
-                )
+                for month, month_group in df.groupby("MONTH", sort=False):
+                    month_rows = month_group.to_dict("records")
+                    month_df = group_and_sort_rows(month_rows)
 
-                worksheet = writer.sheets["Extracted Data"]
-                auto_adjust_column_width(worksheet)
+                    sheet_name = month[:31]
+
+                    month_df.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name=sheet_name
+                    )
+
+                    worksheet = writer.sheets[sheet_name]
+                    auto_adjust_column_width(worksheet)
 
             st.download_button(
                 label="Download Excel",
