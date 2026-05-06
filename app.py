@@ -228,8 +228,8 @@ if uploaded_pdfs:
             st.info(f"Generated file name: {file_name}")
 
             df = df.sort_values(
-                by=["_sort_date", "Debit"],
-                ascending=[True, False]
+                by=["Debit", "_sort_date"],
+                ascending=[False, True]
             )
 
             df["MONTH"] = df["_sort_date"].dt.strftime("%B %Y")
