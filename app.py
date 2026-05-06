@@ -162,7 +162,7 @@ def group_and_sort_rows(rows):
                     "GLOBAL SERIAL NUMBER": row["Cheque no. / Billing Doc No."],
                     "INVOICE NUMBER": row["Csh Rpt No / Invoice No"],
                     "INVOICE DATE": row["Date"],
-                    "DEBIT": row["Debit"]
+                    "DEBIT": f"{row['Debit']:,.2f}"
                 })
 
             final_rows.append({
