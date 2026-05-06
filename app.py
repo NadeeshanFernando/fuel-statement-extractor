@@ -23,6 +23,18 @@ def parse_amount(value):
         return None
 
 
+def get_debit_prefix(debit_value):
+    """
+    Example:
+    1,957,228.68 -> 1957228 -> first 2 digits -> 19
+    """
+    if debit_value is None:
+        return None
+
+    clean_number = str(int(debit_value))
+    return clean_number[:2] if len(clean_number) >= 2 else clean_number
+
+
 def is_valid_invoice(value):
     return bool(value and re.match(r"^\d{8}B\d+$", value.strip()))
 
@@ -41,7 +53,7 @@ def build_file_name(rows):
 
 
 def extract_required_rows(pdf_file):
-    rows = []
+    all_candidate_rows = []
 
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -63,9 +75,6 @@ def extract_required_rows(pdf_file):
                     if not is_valid_invoice(invoice_no):
                         continue
 
-                    if not is_valid_billing_doc(billing_doc_no):
-                        continue
-
                     debit_value = parse_amount(debit_text)
 
                     if debit_value is None:
@@ -77,15 +86,37 @@ def extract_required_rows(pdf_file):
                     except ValueError:
                         continue
 
-                    rows.append({
+                    debit_prefix = get_debit_prefix(debit_value)
+
+                    all_candidate_rows.append({
                         "Date": formatted_date,
                         "Csh Rpt No / Invoice No": invoice_no,
                         "Cheque no. / Billing Doc No.": billing_doc_no,
                         "Debit": debit_value,
-                        "_sort_date": date_obj
+                        "_sort_date": date_obj,
+                        "_has_valid_billing": is_valid_billing_doc(billing_doc_no),
+                        "_debit_prefix": debit_prefix
                     })
 
-    return rows
+    valid_debit_prefixes = set()
+
+    for row in all_candidate_rows:
+        if row["_has_valid_billing"]:
+            valid_debit_prefixes.add(row["_debit_prefix"])
+
+    final_rows = []
+
+    for row in all_candidate_rows:
+        if row["_has_valid_billing"] or row["_debit_prefix"] in valid_debit_prefixes:
+            final_rows.append({
+                "Date": row["Date"],
+                "Csh Rpt No / Invoice No": row["Csh Rpt No / Invoice No"],
+                "Cheque no. / Billing Doc No.": row["Cheque no. / Billing Doc No."],
+                "Debit": row["Debit"],
+                "_sort_date": row["_sort_date"]
+            })
+
+    return final_rows
 
 
 def remove_duplicate_combinations(df):
