@@ -88,6 +88,16 @@ def extract_required_rows(pdf_file):
     return rows
 
 
+def remove_duplicate_combinations(df):
+    return df.drop_duplicates(
+        subset=[
+            "Csh Rpt No / Invoice No",
+            "Cheque no. / Billing Doc No."
+        ],
+        keep="first"
+    )
+
+
 def group_and_sort_rows(rows):
     df = pd.DataFrame(rows)
 
@@ -171,12 +181,20 @@ if uploaded_pdfs:
         if not all_rows:
             st.warning("No valid rows found.")
         else:
-            file_name = build_file_name(all_rows)
-
-            st.success(f"Extracted {len(all_rows)} total valid rows.")
-            st.info(f"Generated file name: {file_name}")
+            original_count = len(all_rows)
 
             df = pd.DataFrame(all_rows)
+            df = remove_duplicate_combinations(df)
+
+            duplicate_count = original_count - len(df)
+
+            rows_after_duplicates = df.to_dict("records")
+            file_name = build_file_name(rows_after_duplicates)
+
+            st.success(f"Extracted {original_count} total valid rows.")
+            st.info(f"Removed {duplicate_count} duplicate row(s).")
+            st.info(f"Final row count: {len(df)}")
+            st.info(f"Generated file name: {file_name}")
 
             df = df.sort_values(
                 by=["_sort_date", "Debit"],
