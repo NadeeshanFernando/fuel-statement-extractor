@@ -159,6 +159,63 @@ def group_and_sort_rows(rows):
             for _, row in debit_group.iterrows():
                 final_rows.append({
                     "MONTH": month,
+                    "GLOBAL SERIAL NUMBER": str(row["Cheque no. / Billing Doc No."]).strip(),
+                    "INVOICE NUMBER": str(row["Csh Rpt No / Invoice No"]).strip(),
+                    "INVOICE DATE": row["Date"],
+                    "DEBIT": f"{row['Debit']:,.2f}"
+                })
+
+            final_rows.append({
+                "MONTH": "",
+                "GLOBAL SERIAL NUMBER": "",
+                "INVOICE NUMBER": "",
+                "INVOICE DATE": "",
+                "DEBIT": ""
+            })
+
+    result_df = pd.DataFrame(final_rows)
+
+    result_df = result_df.drop_duplicates(
+        subset=[
+            "MONTH",
+            "GLOBAL SERIAL NUMBER",
+            "INVOICE NUMBER",
+            "INVOICE DATE",
+            "DEBIT"
+        ],
+        keep="first"
+    )
+
+    return result_df
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        return df
+
+    df = df.sort_values(
+        by=["Debit", "_sort_date"],
+        ascending=[False, True]
+    )
+
+    df["MONTH"] = df["_sort_date"].dt.strftime("%B %Y")
+
+    final_rows = []
+
+    for month, month_group in df.groupby("MONTH", sort=False):
+        debit_groups = month_group.sort_values(
+            by="Debit",
+            ascending=False
+        ).groupby("Debit", sort=False)
+
+        for debit, debit_group in debit_groups:
+            debit_group = debit_group.sort_values(
+                by="_sort_date",
+                ascending=True
+            )
+
+            for _, row in debit_group.iterrows():
+                final_rows.append({
+                    "MONTH": month,
                     "GLOBAL SERIAL NUMBER": row["Cheque no. / Billing Doc No."],
                     "INVOICE NUMBER": row["Csh Rpt No / Invoice No"],
                     "INVOICE DATE": row["Date"],
@@ -174,7 +231,6 @@ def group_and_sort_rows(rows):
             })
 
     return pd.DataFrame(final_rows)
-
 
 def auto_adjust_column_width(worksheet):
     for column_cells in worksheet.columns:
